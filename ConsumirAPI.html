@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>CRUD Usuários - API Java</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { margin-bottom: 10px; }
+        input, button { padding: 8px; margin: 5px 0; width: 300px; display: block; }
+        button { cursor: pointer; width: 150px; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #f4f4f4; }
+        .actions button { margin-right: 5px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .container { display: flex; gap: 40px; }
+        .form-section { flex: 1; }
+        .list-section { flex: 2; }
+    </style>
+</head>
+<body onload="listarUsuarios()">
+<h1>CRUD de Usuários</h1>
+
+<div class="container">
+    <div class="form-section">
+        <h3>Novo / Editar Usuário</h3>
+        <div class="form-group">
+            <label>ID (automático)</label>
+            <input type="text" id="id" disabled>
+        </div>
+        <div class="form-group">
+            <label>Nome</label>
+            <input type="text" id="nome" placeholder="Digite o nome">
+        </div>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="email" placeholder="Digite o email">
+        </div>
+        <button onclick="salvarUsuario()" id="btnSalvar">Salvar</button>
+        <button onclick="limparFormulario()" style="background: #ccc;">Cancelar</button>
+        <div id="mensagem" style="margin-top: 10px; color: green; font-weight: bold;"></div>
+    </div>
+
+    <div class="list-section">
+        <h3>Lista de Usuários</h3>
+        <button onclick="listarUsuarios()">Atualizar Lista</button>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Email</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaUsuarios">
+                <tr>
+                    <td colspan="4" style="text-align: center;">Carregando usuários...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const API_URL = "http://localhost:8001/usuarios";
+    
+    // Exibir mensagem
+    function mostrarMensagem(texto, cor = 'green') {
+        const mensagemDiv = document.getElementById('mensagem');
+        mensagemDiv.style.color = cor;
+        mensagemDiv.textContent = texto;
+        setTimeout(() => mensagemDiv.textContent = '', 3000);
+    }
+
+    // LISTAR TODOS OS USUÁRIOS
+    function listarUsuarios() {
+        fetch(API_URL, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro HTTP: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(dados => {
+            const tabela = document.getElementById("tabelaUsuarios");
+            
+            if (!dados || dados.length === 0) {
+                tabela.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center;">
+                            Nenhum usuário cadastrado
+                        </td>
+                    </tr>`;
+                return;
+            }
+            
+            tabela.innerHTML = "";
+            dados.forEach(usuario => {
+                // Escapar aspas para evitar problemas no HTML
+                const nomeSeguro = usuario.nome ? usuario.nome.replace(/'/g, "\\'").replace(/"/g, '&quot;') : '';
+                const emailSeguro = usuario.email ? usuario.email.replace(/'/g, "\\'").replace(/"/g, '&quot;') : '';
+                
+                tabela.innerHTML += `
+                    <tr>
+                        <td>${usuario.id || ''}</td>
+                        <td>${usuario.nome || ''}</td>
+                        <td>${usuario.email || ''}</td>
+                        <td class="actions">
+                            <button onclick="editarUsuario(${usuario.id}, '${nomeSeguro}', '${emailSeguro}')">
+                                Editar
+                            </button>
+                            <button onclick="excluirUsuario(${usuario.id})" 
+                                    style="background: #ff4444; color: white;">
+                                Excluir
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        })
+        .catch(err => {
+            console.error("Erro ao listar usuários:", err);
+            document.getElementById("tabelaUsuarios").innerHTML = `
+                <tr>
+                    <td colspan="4" style="text-align: center; color: red;">
+                        Erro ao carregar usuários. Verifique se o servidor está rodando.
+                    </td>
+                </tr>`;
+        });
+    }
+
+    // SALVAR USUÁRIO (CREATE ou UPDATE)
+    function salvarUsuario() {
+        const id = document.getElementById("id").value;
+        const nome = document.getElementById("nome").value.trim();
+        const email = document.getElementById("email").value.trim();
+
+        if (!nome || !email) {
+            mostrarMensagem("Preencha todos os campos", "red");
+            return;
+        }
+
+        const usuario = { 
+            nome: nome, 
+            email: email 
+        };
+
+        let url = API_URL;
+        let metodo = "POST";
+        
+        if (id) {
+            // UPDATE - note que sua API espera /usuarios/{id}
+            url = `${API_URL}/${id}`;
+            metodo = "PUT";
+        }
+
+        fetch(url, {
+            method: metodo,
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(usuario)
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.erro || 'Erro na requisição'); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            mostrarMensagem(id ? "Usuário atualizado com sucesso!" : "Usuário criado com sucesso!");
+            limparFormulario();
+            listarUsuarios();
+        })
+        .catch(err => {
+            console.error("Erro ao salvar usuário:", err);
+            mostrarMensagem("Erro: " + err.message, "red");
+        });
+    }
+
+    // EDITAR USUÁRIO
+    function editarUsuario(id, nome, email) {
+        document.getElementById("id").value = id;
+        document.getElementById("nome").value = nome;
+        document.getElementById("email").value = email;
+        
+        const btnSalvar = document.getElementById("btnSalvar");
+        btnSalvar.textContent = "Atualizar";
+        btnSalvar.style.background = "#ffa500";
+        
+        mostrarMensagem("Editando usuário ID: " + id, "blue");
+    }
+
+    // EXCLUIR USUÁRIO
+    function excluirUsuario(id) {
+        if (!confirm(`Deseja realmente excluir o usuário ID: ${id}?`)) {
+            return;
+        }
+
+        fetch(`${API_URL}/${id}`, {
+            method: "DELETE",
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.erro || 'Erro ao excluir'); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            mostrarMensagem("Usuário excluído com sucesso!");
+            listarUsuarios();
+        })
+        .catch(err => {
+            console.error("Erro ao excluir usuário:", err);
+            mostrarMensagem("Erro: " + err.message, "red");
+        });
+    }
+
+    // LIMPAR FORMULÁRIO
+    function limparFormulario() {
+        document.getElementById("id").value = "";
+        document.getElementById("nome").value = "";
+        document.getElementById("email").value = "";
+        
+        const btnSalvar = document.getElementById("btnSalvar");
+        btnSalvar.textContent = "Salvar";
+        btnSalvar.style.background = "";
+        
+        document.getElementById("mensagem").textContent = "";
+    }
+</script>
+
+</body>
+</html>

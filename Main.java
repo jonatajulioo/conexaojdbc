@@ -11,15 +11,6 @@ public class Main {
         List<Usuario> lista = dao.listar();
         lista.forEach(System.out::println);
 
-        if (!lista.isEmpty()) {
-            Usuario u = lista.get(0);
-            u.setNome("Ana Maria Silva");
-            dao.atualizar(u);
-        }
-
-        if (!lista.isEmpty()) {
-            dao.excluir(lista.get(0).getId());
-        }
     }
 
 }
